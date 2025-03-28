@@ -15,6 +15,7 @@ function App() {
   }, []);
 
   const handleButtonClick = async () => {
+    setCount(count + 1);
     const response = await fetch('/increment', {
       method: "POST",
       headers: {
@@ -22,7 +23,6 @@ function App() {
       }
     });
 
-    setCount(count + 1);
 
     if (response.ok) {
       console.log("Request Successful");
