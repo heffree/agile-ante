@@ -43,7 +43,7 @@ async fn main() {
         .fallback_service(get(not_found));
 
     // Start listening on the given address.
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
     println!("listening on {}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
