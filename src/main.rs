@@ -1,27 +1,92 @@
 use axum::{
+    extract::State,
     http::{header, StatusCode, Uri},
-    response::{Html, IntoResponse, Response},
-    routing::{get, Router},
+    response::{sse::Event, Html, IntoResponse, Response, Sse},
+    routing::{get, post, Router},
+    Json,
 };
+use axum_extra::{headers, TypedHeader};
+use futures::Stream;
 use rust_embed::Embed;
-use std::net::SocketAddr;
+use serde::{Deserialize, Serialize};
+use std::{convert::Infallible, net::SocketAddr, sync::Arc, time::Duration};
+use tokio::sync::{broadcast, Mutex};
+
+#[derive(Serialize, Clone, Default)]
+struct PokerEvent {
+    command: String,
+    value: usize,
+}
+
+#[derive(Clone)]
+struct AppState {
+    event: Arc<Mutex<PokerEvent>>,
+    broadcaster: broadcast::Sender<PokerEvent>,
+}
 
 #[tokio::main]
 async fn main() {
+    let event = Arc::new(Mutex::new(PokerEvent::default()));
+    let (tx, _) = broadcast::channel(16);
+    let state = AppState {
+        event,
+        broadcaster: tx,
+    };
     // Define our app routes, including a fallback option for anything not matched.
     let app = Router::new()
         .route("/", get(index_handler))
         .route("/index.html", get(index_handler))
         .route("/assets/{*file}", get(static_handler))
+        .route("/sse", get(sse_handler))
+        .route("/increment", post(increment_handler))
+        .with_state(state)
         .fallback_service(get(not_found));
 
     // Start listening on the given address.
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     println!("listening on {}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    axum::serve(listener, app.into_make_service())
-        .await
-        .unwrap();
+    axum::serve(listener, app).await.unwrap();
+}
+
+async fn increment_handler(State(state): State<AppState>) -> Json<PokerEvent> {
+    let mut event = state.event.lock().await;
+    event.command = "new_count".into();
+    event.value = event.value + 1;
+
+    let _ = state.broadcaster.send(event.clone());
+
+    Json(event.clone())
+}
+
+async fn sse_handler(
+    TypedHeader(user_agent): TypedHeader<headers::UserAgent>,
+    State(state): State<AppState>,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    println!("`{}` connected", user_agent.as_str());
+
+    // subscribe to updates from the broadcaster
+    let mut rx = state.broadcaster.subscribe();
+
+    // create a stream that yields the updated table as JSON each time a new update is sent
+    let stream = async_stream::stream! {
+        loop {
+            match rx.recv().await {
+                Ok(table) => {
+                    let json = serde_json::to_string(&table).unwrap();
+                    yield Ok(Event::default().data(json));
+                }
+                Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(broadcast::error::RecvError::Closed) => break,
+            }
+        }
+    };
+
+    Sse::new(stream).keep_alive(
+        axum::response::sse::KeepAlive::new()
+            .interval(Duration::from_secs(15))
+            .text("keep-alive"),
+    )
 }
 
 // We use static route matchers ("/" and "/index.html") to serve our home
