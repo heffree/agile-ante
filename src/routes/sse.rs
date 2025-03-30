@@ -10,15 +10,15 @@ use axum_extra::{headers, TypedHeader};
 use futures::Stream;
 use tokio::sync::broadcast;
 
-use crate::domain::app_state::AppState;
+use crate::application::Application;
 
-pub fn get_sse_routes() -> Router<AppState> {
+pub fn get_sse_routes() -> Router<Application> {
     Router::new().route("/sse", get(sse_handler))
 }
 
 async fn sse_handler(
     TypedHeader(user_agent): TypedHeader<headers::UserAgent>,
-    State(state): State<AppState>,
+    State(state): State<Application>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     println!("`{:?}` connected", user_agent);
 
