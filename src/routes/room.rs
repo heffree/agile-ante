@@ -1,34 +1,21 @@
 use axum::{
     extract::State,
-    http::StatusCode,
-    response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 use uuid::Uuid;
 
-use crate::{application::Application, domain::poker_event::PokerEvent};
+use crate::{
+    application::{AppError, Application},
+    domain::poker_event::PokerEvent,
+};
 
 pub fn get_room_routes() -> Router<Application> {
     Router::new()
         .route("/create-room", post(create_room_handler))
         .route("/get-rooms", get(get_rooms_handler))
         .route("/increment", post(increment_handler))
-}
-
-#[derive(Error, Debug)]
-pub enum AppError {
-    #[error("Database error: {0}")]
-    DatabaseError(String),
-}
-
-impl IntoResponse for AppError {
-    fn into_response(self) -> Response {
-        let status = StatusCode::INTERNAL_SERVER_ERROR;
-        (status, self.to_string()).into_response()
-    }
 }
 
 /// Used to direct the room creator to their room.
@@ -40,11 +27,8 @@ struct NewRoomResponse {
 async fn create_room_handler(
     State(state): State<Application>,
 ) -> Result<Json<NewRoomResponse>, AppError> {
-    let room_id = state
-        .room_repo
-        .create_new()
-        .await
-        .map_err(|err| AppError::DatabaseError(err.to_string()))?;
+    let room_id = state.room_repo.create_new().await?;
+
     Ok(Json(NewRoomResponse { room_id }))
 }
 
@@ -56,11 +40,7 @@ pub struct GetRoomsResponse {
 async fn get_rooms_handler(
     State(state): State<Application>,
 ) -> Result<Json<GetRoomsResponse>, AppError> {
-    let room_ids = state
-        .room_repo
-        .get_rooms()
-        .await
-        .map_err(|err| AppError::DatabaseError(err.to_string()))?;
+    let room_ids = state.room_repo.get_rooms().await?;
 
     Ok(Json(GetRoomsResponse { room_ids }))
 }

@@ -1,4 +1,4 @@
-use std::{error::Error, sync::Arc};
+use std::sync::Arc;
 
 use sqlx::SqlitePool;
 use uuid::Uuid;
@@ -13,7 +13,7 @@ impl RoomRepository {
         Self { connection_pool }
     }
 
-    pub async fn create_new(&self) -> Result<Uuid, Box<dyn Error>> {
+    pub async fn create_new(&self) -> anyhow::Result<Uuid> {
         let gen_external_id = Uuid::new_v4();
 
         sqlx::query!(
@@ -29,7 +29,7 @@ impl RoomRepository {
         Ok(gen_external_id)
     }
 
-    pub async fn get_rooms(&self) -> Result<Vec<Uuid>, Box<dyn Error>> {
+    pub async fn get_rooms(&self) -> anyhow::Result<Vec<Uuid>> {
         let rooms = sqlx::query_scalar(
             r"
         SELECT external_id FROM rooms
@@ -37,6 +37,7 @@ impl RoomRepository {
         )
         .fetch_all(&*self.connection_pool)
         .await?;
+
         Ok(rooms)
     }
 }

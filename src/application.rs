@@ -1,6 +1,12 @@
 use std::net::SocketAddr;
 
-use axum::{response::Html, routing::get, serve::Serve, Router};
+use axum::{
+    response::{Html, IntoResponse, Response},
+    routing::get,
+    serve::Serve,
+    Router,
+};
+use reqwest::StatusCode;
 use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
 use tokio::sync::{broadcast, Mutex};
 
@@ -60,4 +66,25 @@ impl Application {
 
 pub async fn not_found() -> Html<&'static str> {
     Html("<h1>404</h1><p>Not Found</p>")
+}
+
+pub struct AppError(anyhow::Error);
+
+impl IntoResponse for AppError {
+    fn into_response(self) -> Response {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Something went wrong: {}", self.0),
+        )
+            .into_response()
+    }
+}
+
+impl<E> From<E> for AppError
+where
+    E: Into<anyhow::Error>,
+{
+    fn from(err: E) -> Self {
+        Self(err.into())
+    }
 }
