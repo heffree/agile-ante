@@ -28,7 +28,7 @@ impl TestApp {
             },
         };
         let (port, application) = Application::build(configuration.clone()).await.unwrap();
-        let _ = tokio::spawn(application.into_future());
+        let _ = tokio::spawn(application.into_future()).await;
 
         let api_client = reqwest::Client::builder().build().unwrap();
         //let db_pool = SqlitePool::connect_with(
@@ -45,7 +45,7 @@ impl TestApp {
     }
     pub async fn create_room(&self) -> reqwest::Response {
         self.api_client
-            .post(&format!("{}/create-room", &self.address))
+            .post(format!("{}/create-room", &self.address))
             .header("Content-Type", "application/json")
             .send()
             .await
@@ -55,7 +55,7 @@ impl TestApp {
     pub async fn get_rooms(&self) -> Vec<Uuid> {
         let res = self
             .api_client
-            .get(&format!("{}/get-rooms", &self.address))
+            .get(format!("{}/get-rooms", &self.address))
             .send()
             .await
             .expect("Failed to execute request");
