@@ -1,3 +1,5 @@
+use std::future::IntoFuture;
+
 use agile_ante::{
     application::Application,
     configuration::{ApplicationSettings, DatabaseSettings, Settings},
@@ -26,7 +28,7 @@ impl TestApp {
             },
         };
         let (port, application) = Application::build(configuration.clone()).await.unwrap();
-        let _ = tokio::spawn(application);
+        let _ = tokio::spawn(application.into_future());
 
         let api_client = reqwest::Client::builder().build().unwrap();
         //let db_pool = SqlitePool::connect_with(
@@ -54,7 +56,6 @@ impl TestApp {
         let res = self
             .api_client
             .get(&format!("{}/get-rooms", &self.address))
-            .header("Content-Type", "application/json")
             .send()
             .await
             .expect("Failed to execute request");

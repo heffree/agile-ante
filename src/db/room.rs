@@ -17,10 +17,10 @@ impl RoomRepository {
         let gen_external_id = Uuid::new_v4();
 
         sqlx::query!(
-            r#"
+            r"
         INSERT INTO rooms (external_id)
         VALUES (?1)
-            "#,
+            ",
             gen_external_id
         )
         .execute(&*self.connection_pool)
@@ -31,9 +31,9 @@ impl RoomRepository {
 
     pub async fn get_rooms(&self) -> Result<Vec<Uuid>, Box<dyn Error>> {
         let rooms = sqlx::query_scalar(
-            r#"
+            r"
         SELECT external_id FROM rooms
-            "#,
+            ",
         )
         .fetch_all(&*self.connection_pool)
         .await?;

@@ -1,7 +1,6 @@
-use std::{future::IntoFuture, net::SocketAddr};
+use std::net::SocketAddr;
 
-use axum::{response::Html, routing::get, Router};
-use futures::{future::BoxFuture, TryFutureExt};
+use axum::{response::Html, routing::get, serve::Serve, Router};
 use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
 use tokio::sync::{broadcast, Mutex};
 
@@ -22,22 +21,20 @@ impl Application {
     /// Spawns an instance of the Agile Ante web server.
     pub async fn build(
         configuration: Settings,
-    ) -> Result<(u16, BoxFuture<'static, Result<(), anyhow::Error>>), anyhow::Error> {
+    ) -> anyhow::Result<(u16, Serve<tokio::net::TcpListener, Router, Router>)> {
         let connection_options = SqliteConnectOptions::new()
             .filename(configuration.database.filename)
             .in_memory(configuration.database.enable_in_memory)
             .create_if_missing(true);
         let connection_pool = SqlitePool::connect_with(connection_options).await?;
 
-        sqlx::migrate!("./migrations")
-            .run(&connection_pool)
-            .await
-            .expect("Failed to migrate the database");
+        sqlx::migrate!("./migrations").run(&connection_pool).await?;
 
         let addr = SocketAddr::from(([0, 0, 0, 0], configuration.application.port));
         let (tx, _) = broadcast::channel(16);
-        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-        let port = listener.local_addr().unwrap().port();
+        let listener = tokio::net::TcpListener::bind(addr).await?;
+        let addr = listener.local_addr()?;
+        let port = addr.port();
 
         let state = Application {
             rooms: vec![Room {
@@ -54,14 +51,10 @@ impl Application {
             .merge(client::get_client_routes())
             .fallback_service(get(not_found));
 
-        println!("listening on {}", listener.local_addr().unwrap());
-        let server_future = Box::pin(
-            axum::serve(listener, app)
-                .into_future()
-                .map_err(|err| anyhow::anyhow!("server error {:?}", err)),
-        );
+        println!("listening on {addr}");
+        let serve_future = axum::serve(listener, app);
 
-        Ok((port, Box::pin(server_future)))
+        Ok((port, serve_future))
     }
 }
 
