@@ -10,6 +10,7 @@ pub fn get_client_routes() -> Router {
     Router::new()
         .route("/", get(index_handler))
         .route("/index.html", get(index_handler))
+        .route("/room/{id}", get(index_handler))
         .route("/assets/{*file}", get(static_handler))
 }
 

@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use axum::{
     response::{Html, IntoResponse, Response},
@@ -14,12 +14,12 @@ use crate::{
     configuration::Settings,
     db::room::RoomRepository,
     domain::room::Room,
-    routes::{client, room, sse},
+    routes::{client, room, room_connection},
 };
 
 #[derive(Clone)]
 pub struct Application {
-    pub rooms: Vec<Room>,
+    pub rooms: HashMap<String, Arc<Mutex<Room>>>,
     pub room_repo: RoomRepository,
 }
 
@@ -42,16 +42,17 @@ impl Application {
         let addr = listener.local_addr()?;
         let port = addr.port();
 
-        let state = Application {
-            rooms: vec![Room {
-                count: Mutex::new(0).into(),
-                broadcaster: tx,
-            }],
+        let mut state = Application {
+            rooms: HashMap::new(),
             room_repo: RoomRepository::new(connection_pool.into()),
         };
 
+        state
+            .rooms
+            .insert("testing".into(), Arc::new(Room::new(tx).into()));
+
         let app = Router::new()
-            .merge(sse::get_sse_routes())
+            .merge(room_connection::get_room_connection_routes())
             .merge(room::get_room_routes())
             .with_state(state)
             .merge(client::get_client_routes())

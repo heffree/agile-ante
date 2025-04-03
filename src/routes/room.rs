@@ -6,16 +6,13 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{
-    application::{AppError, Application},
-    domain::poker_event::PokerEvent,
-};
+use crate::application::{AppError, Application};
 
 pub fn get_room_routes() -> Router<Application> {
     Router::new()
         .route("/create-room", post(create_room_handler))
         .route("/get-rooms", get(get_rooms_handler))
-        .route("/increment", post(increment_handler))
+        .route("/get-players", get(get_players_handler))
 }
 
 /// Used to direct the room creator to their room.
@@ -45,17 +42,15 @@ async fn get_rooms_handler(
     Ok(Json(GetRoomsResponse { room_ids }))
 }
 
-async fn increment_handler(State(state): State<Application>) -> Json<PokerEvent> {
-    let room = &state.rooms[0];
-    let mut count = room.count.lock().await;
-    *count += 1;
+#[derive(Deserialize, Serialize, Clone, Default)]
+pub struct GetPlayersResponse {
+    pub players: Vec<Uuid>,
+}
 
-    let event = PokerEvent {
-        command: "new_count".into(),
-        value: *count,
-    };
+async fn get_players_handler(
+    State(state): State<Application>,
+) -> Result<Json<GetPlayersResponse>, AppError> {
+    let players = state.room_repo.get_rooms().await?;
 
-    let _ = room.broadcaster.send(event.clone());
-
-    Json(event)
+    Ok(Json(GetPlayersResponse { players }))
 }
