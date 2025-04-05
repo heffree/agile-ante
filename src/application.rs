@@ -28,12 +28,14 @@ impl Application {
     pub async fn build(
         configuration: Settings,
     ) -> anyhow::Result<(u16, Serve<tokio::net::TcpListener, Router, Router>)> {
+        println!("Building Application");
         let connection_options = SqliteConnectOptions::new()
             .filename(configuration.database.filename)
             .in_memory(configuration.database.enable_in_memory)
             .create_if_missing(true);
         let connection_pool = SqlitePool::connect_with(connection_options).await?;
 
+        println!("Running migrations");
         sqlx::migrate!("./migrations").run(&connection_pool).await?;
 
         let addr = SocketAddr::from(([0, 0, 0, 0], configuration.application.port));
