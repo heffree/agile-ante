@@ -24,10 +24,10 @@ export function Room() {
       const data = JSON.parse(event.data);
       console.log('data', data);
       if (data.command == 'PlayerJoined') {
-        setPlayers((players) => [...players, data.value]);
+        setPlayers((players) => [...players, data.value.id]);
         setPlayerCount((playerCount) => playerCount + 1);
       } else if (data.command == 'PlayerLeft') {
-        setPlayers((players) => players.filter((player) => player !== data.value));
+        setPlayers((players) => players.filter((player) => player !== data.value.id));
         setPlayerCount((playerCount) => playerCount - 1);
       }
     }
