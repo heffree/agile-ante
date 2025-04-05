@@ -17,7 +17,7 @@ async fn main() -> anyhow::Result<()> {
             enable_demo_mode: false,
         },
         database: DatabaseSettings {
-            filename: db_filename,
+            filename: db_filename.split(":").last().unwrap().into(),
             enable_in_memory: false,
         },
     })
