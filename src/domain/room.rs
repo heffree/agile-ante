@@ -21,7 +21,13 @@ impl Room {
 
     pub fn add_player(&mut self, id: &str) {
         let uuid = Uuid::from_str(&id).unwrap();
-        self.players.push(uuid);
+        if !self.players.contains(&uuid) {
+            self.players.push(uuid);
+        }
+    }
+
+    pub fn get_players(&self) -> Vec<Uuid> {
+        self.players.clone()
     }
 
     pub fn remove_player(&mut self, id: &str) {

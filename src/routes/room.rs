@@ -1,5 +1,5 @@
 use axum::{
-    extract::State,
+    extract::{Path, State},
     routing::{get, post},
     Json, Router,
 };
@@ -9,10 +9,13 @@ use uuid::Uuid;
 use crate::application::{AppError, Application};
 
 pub fn get_room_routes() -> Router<Application> {
-    Router::new()
-        .route("/create-room", post(create_room_handler))
-        .route("/get-rooms", get(get_rooms_handler))
-        .route("/get-players", get(get_players_handler))
+    Router::new().nest(
+        "/rooms",
+        Router::new()
+            .route("/", post(create_room_handler))
+            .route("/", get(get_rooms_handler))
+            .route("/{id}/players", get(get_players_handler)),
+    )
 }
 
 /// Used to direct the room creator to their room.
@@ -49,8 +52,9 @@ pub struct GetPlayersResponse {
 
 async fn get_players_handler(
     State(state): State<Application>,
+    Path(id): Path<String>,
 ) -> Result<Json<GetPlayersResponse>, AppError> {
-    let players = state.room_repo.get_rooms().await?;
+    let players = state.rooms.get(&id).unwrap().lock().await.get_players();
 
     Ok(Json(GetPlayersResponse { players }))
 }

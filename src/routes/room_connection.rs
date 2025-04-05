@@ -1,4 +1,4 @@
-use std::{convert::Infallible, time::Duration};
+use std::{convert::Infallible, sync::Arc, time::Duration};
 
 use axum::{
     extract::{Path, State},
@@ -8,13 +8,38 @@ use axum::{
 };
 use axum_extra::extract::{cookie::Cookie, CookieJar};
 use futures::Stream;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, Mutex};
 use uuid::Uuid;
 
-use crate::{application::Application, domain::poker_event::PokerEvent};
+use crate::{
+    application::Application,
+    domain::{poker_event::PokerEvent, room::Room},
+};
 
 pub fn get_room_connection_routes() -> Router<Application> {
     Router::new().route("/room-connection/{id}", get(room_connection_handler))
+}
+
+struct SseGuard {
+    room_arc: Arc<Mutex<Room>>,
+    device_id: String,
+}
+
+impl Drop for SseGuard {
+    fn drop(&mut self) {
+        let device_id = self.device_id.clone();
+        let room_arc = self.room_arc.clone();
+        tokio::spawn(async move {
+            let mut room = room_arc.lock().await;
+            room.remove_player(&device_id);
+
+            println!("Client disconnected {}", device_id);
+            let leave_event = PokerEvent::PlayerLeft {
+                id: device_id.into(),
+            };
+            let _ = room.broadcaster.send(leave_event);
+        });
+    }
 }
 
 async fn room_connection_handler(
@@ -37,8 +62,10 @@ async fn room_connection_handler(
     };
 
     println!("{device_id} device connected to room {id}");
+
     let room_arc = state.rooms.get_mut(&id).unwrap();
     let mut room = room_arc.lock().await;
+
     room.add_player(&device_id);
 
     let join_event = PokerEvent::PlayerJoined {
@@ -48,7 +75,12 @@ async fn room_connection_handler(
 
     let room_arc_stream = room_arc.clone();
     let mut rx = room.broadcaster.subscribe();
+
     let stream = async_stream::stream! {
+        let _guard = SseGuard {
+            room_arc: room_arc_stream.clone(),
+            device_id: device_id.clone(),
+        };
         loop {
             match rx.recv().await {
                 Ok(event) => {
@@ -57,11 +89,6 @@ async fn room_connection_handler(
                 }
                 Err(broadcast::error::RecvError::Lagged(_)) => continue,
                 Err(broadcast::error::RecvError::Closed) => {
-                    let mut room = room_arc_stream.lock().await;
-                    room.remove_player(&device_id);
-
-                    let leave_event = PokerEvent::PlayerLeft { id: device_id.into() };
-                    let _ = room.broadcaster.send(leave_event);
 
                     break;
                 },

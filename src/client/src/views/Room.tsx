@@ -6,26 +6,19 @@ export function Room() {
   const [players, setPlayers] = useState([] as string[]);
   const [playerCount, setPlayerCount] = useState(0);
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const response = await fetch('/get-players');
-        if (!response.ok) {
-          throw new Error('Network response was not ok');
-        }
-        const result = await response.json();
-        console.log(result);
-        setPlayers(result.players as string[]);
-        setPlayers(result.players.length)
-      } catch (error) {
-        console.error('Fetch error:', error);
-      }
-    }
-    fetchData();
-  }, []);
+  const handleButtonClick = async () => {
+    const response = await fetch(`/rooms/${id}/players`);
+    const result = await response.json();
+    setPlayers(result.players);
+    setPlayerCount(result.players.length);
+  }
 
   useEffect(() => {
     const eventSource = new EventSource(`/room-connection/${id}`);
+
+    eventSource.onopen = () => {
+      fetchData();
+    }
 
     eventSource.onmessage = (event) => {
       const data = JSON.parse(event.data);
@@ -39,8 +32,22 @@ export function Room() {
       }
     }
 
-  }, [id]);
+    async function fetchData() {
+      try {
+        const response = await fetch(`/rooms/${id}/players`);
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        const result = await response.json();
+        console.log(result);
+        setPlayers(result.players as string[]);
+        setPlayerCount(result.players.length)
+      } catch (error) {
+        console.error('Fetch error:', error);
+      }
+    }
 
+  }, [id]);
 
 
   return (
@@ -48,6 +55,9 @@ export function Room() {
       <div className="card">
         Players {players}
       </div>
+      <button onClick={handleButtonClick}>
+        Get Players
+      </button>
       <div className="card">
         Player Count {playerCount}
       </div>
