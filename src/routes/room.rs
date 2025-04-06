@@ -6,7 +6,10 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::application::{AppError, Application};
+use crate::{
+    application::{AppError, Application},
+    domain::player::Player,
+};
 
 pub fn get_room_routes() -> Router<Application> {
     Router::new().nest(
@@ -47,14 +50,22 @@ async fn get_rooms_handler(
 
 #[derive(Deserialize, Serialize, Clone, Default)]
 pub struct GetPlayersResponse {
-    pub players: Vec<Uuid>,
+    pub players: Vec<PlayerJsonResponse>,
+}
+
+#[derive(Deserialize, Serialize, Clone, Default)]
+pub struct PlayerJsonResponse {
+    pub id: usize,
+    pub name: String,
 }
 
 async fn get_players_handler(
     State(state): State<Application>,
     Path(id): Path<String>,
 ) -> Result<Json<GetPlayersResponse>, AppError> {
-    let players = state.rooms.get(&id).unwrap().lock().await.get_players();
+    let players = state.rooms.get(&id).unwrap().lock().await;
 
-    Ok(Json(GetPlayersResponse { players }))
+    Ok(Json(GetPlayersResponse {
+        players: Player::vec_to_get_json_response(players.get_players()),
+    }))
 }

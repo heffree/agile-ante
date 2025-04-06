@@ -62,6 +62,7 @@ async fn room_connection_handler(
     };
 
     println!("{device_id} device connected to room {id}");
+    let name = format!("name - {}", device_id.to_string());
 
     let room_arc = state.rooms.get_mut(&id).unwrap();
     let mut room = room_arc.lock().await;

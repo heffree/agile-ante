@@ -12,7 +12,7 @@ use tokio::sync::{broadcast, Mutex};
 
 use crate::{
     configuration::Settings,
-    db::room::RoomRepository,
+    db::room_repository::RoomRepository,
     domain::room::Room,
     routes::{client, room, room_connection},
 };
